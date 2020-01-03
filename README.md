@@ -1,4 +1,4 @@
-A primer on CTC implementation in pure Python PyTorch code. Features:
+A primer on CTC implementation in pure Python PyTorch code. This impl is not suitable for real-world usage, only for experimentation and research on CTC modifications. Features:
 - CTC impl is in Python and its only loop is over time steps (parallelizes over batch and symbol dimensions)
 - Gradients are computed via PyTorch autograd instead of a separate beta computation
 - Viterbi path useful for forced alignment
