@@ -2,8 +2,6 @@ import torch
 import torch.nn.functional as F
 
 def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0, reduction : str = 'none', alignment : bool = False):
-	# https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/LossCTC.cpp#L37
-	# https://github.com/skaae/Lasagne-CTC/blob/master/ctc_cost.py#L162
 	B = torch.arange(len(targets), device = input_lengths.device)
 	targets_ = torch.cat([targets, targets[:, :1]], dim = -1)
 	targets_ = torch.stack([torch.full_like(targets_, blank), targets_], dim = -1).flatten(start_dim = -2)
@@ -19,6 +17,7 @@ def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0,
 	log_alpha = torch.full((len(log_probs), len(B), zero_padding + targets_.shape[-1]), zero, device = log_probs.device, dtype = log_probs.dtype)
 	log_alpha[0, :, zero_padding + 0] = log_probs[0, :, blank]
 	log_alpha[0, :, zero_padding + 1] = log_probs[0, B, targets_[:, 1]]
+	# log_alpha[:, 1:, 2:] = log_probs.gather(-1, targets_.expand(len(log_probs), -1, -1))[1:]
 	for t in range(1, len(log_probs)):
 		log_alpha[t, :, 2:] = log_probs_[t] + logadd(log_alpha[t - 1, :, 2:], log_alpha[t - 1, :, 1:-1], torch.where(diff_labels, log_alpha[t - 1, :, :-2], zero))
 
