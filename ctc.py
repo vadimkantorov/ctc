@@ -1,8 +1,35 @@
 import torch
 import torch.nn.functional as F
 
-# https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/LossCTC.cpp#L37
-# https://github.com/skaae/Lasagne-CTC/blob/master/ctc_cost.py#L162
+class LogsumexpFunction(torch.autograd.function.Function):
+	@staticmethod
+	def forward(self, x0, x1, x2):
+		m = torch.max(torch.max(x0, x1), x2)
+		m = m.masked_fill_(torch.isinf(m), 0)
+		e0 = (x0 - m).exp_()
+		e1 = (x1 - m).exp_()
+		e2 = (x2 - m).exp_()
+		e = (e0 + e1 + e2).clamp_(min = 1e-16)
+		self.save_for_backward(e0, e1, e2, e)
+		return e.log().add_(m)
+
+	@staticmethod
+	def backward(self, grad_output):
+		e0, e1, e2, e = self.saved_tensors
+		g = grad_output / e
+		return g * e0, g * e1, g * e2
+
+def logadd(x0, x1, x2):
+	return LogsumexpFunction.apply(x0, x1, x2)
+
+	# produces nan gradients in backward:
+	# return torch.logsumexp(torch.stack([x0, x1, x2]), dim = 0)
+	
+	# produces inplace modification error https://github.com/pytorch/pytorch/issues/31819
+	#m = torch.max(torch.max(x0, x1), x2)
+	#m = m.masked_fill(m == float('-inf'), 0)
+	#res = (x0 - m).exp() + (x1 - m).exp() + (x2 - m).exp()
+	#return res.log().add(m)
 
 def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, logits, blank = 0):
 	ctc_loss = F.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = blank, reduction = 'sum')
@@ -11,6 +38,8 @@ def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, log
 	return (log_probs.exp() * temporal_mask - ctc_grad).detach()
 
 def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0, reduction : str = 'none', alignment : bool = False):
+	# https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/LossCTC.cpp#L37
+	# https://github.com/skaae/Lasagne-CTC/blob/master/ctc_cost.py#L162
 	B = torch.arange(len(targets), device = input_lengths.device)
 	targets_ = torch.cat([targets, targets[:, :1]], dim = -1)
 	targets_ = torch.stack([torch.full_like(targets_, blank), targets_], dim = -1).flatten(start_dim = -2)
@@ -23,14 +52,6 @@ def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0,
 	log_alpha[0, :, zero_padding + 1] = log_probs[0, B, targets_[:, 1]]
 	for t in range(1, len(log_probs)):
 		log_alpha[t, :, 2:] = log_probs_[t] + logadd(log_alpha[t - 1, :, 2:], log_alpha[t - 1, :, 1:-1], torch.where(diff_labels, log_alpha[t - 1, :, :-2], zero))
-	#log_alpha = [torch.full((len(B), zero_padding + targets_.shape[-1]), zero, device = log_probs.device, dtype = log_probs.dtype)]
-	#log_alpha[0][:, zero_padding + 0] = log_probs[0, :, blank]
-	#log_alpha[0][:, zero_padding + 1] = log_probs[0, B, targets_[:, 1]]
-	#for t in range(1, len(log_probs)):
-	#	log_alpha_ = torch.full_like(log_alpha[-1], zero, device = log_probs.device, dtype = log_probs.dtype)
-	#	log_alpha_[:, zero_padding:] = log_probs_[t] + logadd(log_alpha[-1][:, 2:], log_alpha[-1][:, 1:-1], torch.where(diff_labels, log_alpha[- 1][:, :-2], zero))
-	#	log_alpha.append(log_alpha_)
-	#log_alpha = torch.stack(log_alpha)
 
 	l1l2 = log_alpha[input_lengths - 1, B].gather(-1, torch.stack([zero_padding + target_lengths * 2 - 1, zero_padding + target_lengths * 2], dim = -1)) 
 	loss = -torch.logsumexp(l1l2, dim = -1)
@@ -44,14 +65,6 @@ def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0,
 		indices_ = torch.stack([(indices - 2) * diff_labels[B, (indices - zero_padding).clamp(min = 0)], (indices - 1).clamp(min = 0), indices], dim = -1)
 		path[t - 1] += (indices - 2 + log_alpha[t - 1, B].gather(-1, indices_).max(dim = -1).indices).clamp(min = 0)
 	return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., 3::2]
-
-def logadd(x0, x1, x2):
-	# equivalent to the slower version:
-	return torch.logsumexp(torch.stack([x0, x1, x2]), dim = 0)
-	m = torch.max(torch.max(x0, x1), x2)
-	m.masked_fill_(m == float('-inf'), 0)
-	res = (x0 - m).exp_() + (x1 - m).exp_() + (x2 - m).exp_()
-	return res.log_().add_(m)
 
 if __name__ == '__main__':
 	import time
