@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 
+#@torch.jit.script
 def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0, reduction : str = 'none', alignment : bool = False):
 	B = torch.arange(len(targets), device = input_lengths.device)
 	targets_ = torch.cat([targets, targets[:, :1]], dim = -1)
