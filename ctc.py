@@ -31,11 +31,11 @@ def logadd(x0, x1, x2):
 	#res = (x0 - m).exp() + (x1 - m).exp() + (x2 - m).exp()
 	#return res.log().add(m)
 
-def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, logits, blank = 0):
-	ctc_loss = F.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = blank, reduction = 'sum')
-	ctc_grad, = torch.autograd.grad(ctc_loss, (logits,), retain_graph = True)
+def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, logits, blank = 0, ctc_loss = F.ctc_loss):
+	loss = ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = blank, reduction = 'sum')
+	grad, = torch.autograd.grad(loss, logits, retain_graph = True)
 	temporal_mask = (torch.arange(len(log_probs), device = input_lengths.device, dtype = input_lengths.dtype).unsqueeze(1) < input_lengths.unsqueeze(0)).unsqueeze(-1)
-	return (log_probs.exp() * temporal_mask - ctc_grad).detach()
+	return (log_probs.exp() * temporal_mask - grad).detach()
 
 def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0, reduction : str = 'none', alignment : bool = False):
 	# https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/LossCTC.cpp#L37
