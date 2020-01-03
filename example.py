@@ -37,7 +37,7 @@ toc = tictoc()
 custom_ctc_grad, = torch.autograd.grad(custom_ctc.sum(), logits, retain_graph = True)
 print('Custom CTC loss', 'fwd', toc - tic, 'bwd', tictoc() - toc)
 
-ce_alignment_targets = ctc.ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, blank = 0, logits = logits)
+ce_alignment_targets = ctc.ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, blank = 0)
 ce_ctc = -ce_alignment_targets * log_probs
 ce_ctc_grad, = torch.autograd.grad(ce_ctc.sum(), logits, retain_graph = True)
 

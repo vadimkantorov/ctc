@@ -35,16 +35,20 @@ def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0,
 		path[t - 1] += (indices - 2 + log_alpha[t - 1, B].gather(-1, indices_).max(dim = -1).indices).clamp(min = 0)
 	return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., (zero_padding + 1)::2]
 
-def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, logits, blank = 0, ctc_loss = F.ctc_loss):
+def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, blank = 0, ctc_loss = F.ctc_loss, retain_graph = True):
 	loss = ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = blank, reduction = 'sum')
-	grad, = torch.autograd.grad(loss, logits, retain_graph = True)
+	probs = log_probs.exp()
+	# to simplify API we inline log_softmax gradient, i.e. next two liens are equivalent to: grad_logits, = torch.autograd.grad(loss, logits, retain_graph = True). gradient formula explained at https://stackoverflow.com/questions/35304393/trying-to-understand-code-that-computes-the-gradient-wrt-to-the-input-for-logsof
+	grad_log_probs, = torch.autograd.grad(loss, log_probs, retain_graph = retain_graph)
+	grad_logits = grad_log_probs - probs * grad_log_probs.sum(dim = -1, keepdim = True)
 	temporal_mask = (torch.arange(len(log_probs), device = input_lengths.device, dtype = input_lengths.dtype).unsqueeze(1) < input_lengths.unsqueeze(0)).unsqueeze(-1)
-	return (log_probs.exp() * temporal_mask - grad).detach()
+	return (probs * temporal_mask - grad_logits).detach()
 
 def logadd(x0, x1, x2):
 	# produces nan gradients in backward if -inf log-space zero element is used https://github.com/pytorch/pytorch/issues/31829
 	return torch.logsumexp(torch.stack([x0, x1, x2]), dim = 0)
 	
+	# use if -inf log-space zero element is used
 	#return LogsumexpFunction.apply(x0, x1, x2)
 	
 	# produces inplace modification error https://github.com/pytorch/pytorch/issues/31819
