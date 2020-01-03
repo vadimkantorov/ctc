@@ -22,12 +22,12 @@ class LogsumexpFunction(torch.autograd.function.Function):
 def logadd(x0, x1, x2):
 	return LogsumexpFunction.apply(x0, x1, x2)
 
-	# produces nan gradients in backward:
-	# return torch.logsumexp(torch.stack([x0, x1, x2]), dim = 0)
+	# produces nan gradients in backward if -inf log-space zero element is used https://github.com/pytorch/pytorch/issues/31829
+	#return torch.logsumexp(torch.stack([x0, x1, x2]), dim = 0)
 	
 	# produces inplace modification error https://github.com/pytorch/pytorch/issues/31819
 	#m = torch.max(torch.max(x0, x1), x2)
-	#m = m.masked_fill(m == float('-inf'), 0)
+	#m = m.masked_fill(torch.isinf(m), 0)
 	#res = (x0 - m).exp() + (x1 - m).exp() + (x2 - m).exp()
 	#return res.log().add(m)
 
@@ -44,7 +44,7 @@ def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0,
 	targets_ = torch.cat([targets, targets[:, :1]], dim = -1)
 	targets_ = torch.stack([torch.full_like(targets_, blank), targets_], dim = -1).flatten(start_dim = -2)
 	diff_labels = torch.cat([torch.as_tensor([[False, False]], device = targets.device).expand(len(B), -1), targets_[:, 2:] != targets_[:, :-2]], dim = 1)
-	
+	#torch.finfo(log_probs.dtype).min	
 	zero, zero_padding = torch.tensor(float('-inf'), device = log_probs.device, dtype = log_probs.dtype), 2
 	log_probs_ = log_probs.gather(-1, targets_.expand(len(log_probs), -1, -1))
 	log_alpha = torch.full((len(log_probs), len(B), zero_padding + targets_.shape[-1]), zero, device = log_probs.device, dtype = log_probs.dtype)
@@ -70,40 +70,57 @@ if __name__ == '__main__':
 	import time
 	import matplotlib.pyplot as plt
 	
-	T, B, C = 16, 4, 2
-	t = 4#T // 2 - 4
+	T, B, C = 128, 256, 32
+	t = T // 2 - 4
+	blank = 0
 	device = 'cuda'
 	seed = 1
-	rtol = 1e-3
+	atol = 1e-3
 	for set_seed in [torch.manual_seed] + ([torch.cuda.manual_seed_all] if device == 'cuda' else []):
 		set_seed(seed)
+	tictoc = lambda: (device == 'cuda' and torch.cuda.synchronize()) or time.time()
 
 	logits = torch.randn(T, B, C, device = device).requires_grad_()
-	log_probs = logits.log_softmax(dim = -1)
-	targets = torch.randint(1, C, (B, t), dtype = torch.long, device = device)
+	targets = torch.randint(blank + 1, C, (B, t), dtype = torch.long, device = device)
 	input_lengths = torch.full((B,), T, dtype = torch.long, device = device)
 	target_lengths = torch.full((B,), t, dtype = torch.long, device = device)
+	log_probs = logits.log_softmax(dim = -1)
+	
+	print('Device:', device)
+	print('Log-probs shape:', 'x'.join(map(str, log_probs.shape)))
 
-	tictoc = lambda: (device == 'cuda' and torch.cuda.synchronize()) or time.time()
 	tic = tictoc()
 	builtin_ctc = F.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none')
-	print('Built-in CTC loss', tictoc() - tic)
-	ce_ctc = (-ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, blank = 0, logits = logits) * log_probs)
+	toc = tictoc()
+	builtin_ctc_grad, = torch.autograd.grad(builtin_ctc.sum(), logits, retain_graph = True)
+	print('Built-in CTC loss', 'fwd', toc - tic, 'bwd', tictoc() - toc)
 
 	tic = tictoc()
 	custom_ctc = ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none')
-	print('Custom CTC loss', tictoc() - tic)
-	
-	builtin_ctc_grad, = torch.autograd.grad(builtin_ctc.sum(), logits, retain_graph = True)
+	toc = tictoc()
 	custom_ctc_grad, = torch.autograd.grad(custom_ctc.sum(), logits, retain_graph = True)
+	print('Custom CTC loss', 'fwd', toc - tic, 'bwd', tictoc() - toc)
+
+	ce_alignment_targets = ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, blank = 0, logits = logits)
+	ce_ctc = -ce_alignment_targets * log_probs
 	ce_ctc_grad, = torch.autograd.grad(ce_ctc.sum(), logits, retain_graph = True)
 
-	print('Device:', device)
-	print('Log-probs shape:', 'x'.join(map(str, log_probs.shape)))
-	print('Custom loss matches:', torch.allclose(builtin_ctc, custom_ctc, rtol = rtol))
-	print('Grad matches:', torch.allclose(builtin_ctc_grad, custom_ctc_grad, rtol = rtol))
-	print('CE grad matches:', torch.allclose(builtin_ctc_grad, ce_ctc_grad, rtol = rtol))
-	
-	#P = ctc_alignment(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none')
-	#plt.imshow(P[1].t(), origin = 'lower', aspect = 'auto')
-	#plt.savefig('data/alignment.jpg')
+	print('Custom loss matches:', torch.allclose(builtin_ctc, custom_ctc, atol = atol))
+	print('Grad matches:', torch.allclose(builtin_ctc_grad, custom_ctc_grad, atol = atol))
+	print('CE grad matches:', torch.allclose(builtin_ctc_grad, ce_ctc_grad, atol = atol))
+
+	alignment = ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none', alignment = True)
+	a = alignment[:, 0, :target_lengths[0]]
+	plt.subplot(211)
+	plt.title('Input-Output Viterbi alignment')
+	plt.imshow(a.t().cpu(), origin = 'lower', aspect = 'auto')
+	plt.xlabel('Input steps')
+	plt.ylabel('Output steps')
+	plt.subplot(212)
+	plt.title('CTC alignment targets')
+	a = ce_alignment_targets[:, 0, :]
+	plt.imshow(a.t().cpu(), origin = 'lower', aspect = 'auto')
+	plt.xlabel('Input steps')
+	plt.ylabel(f'Output symbols, blank {blank}')
+	plt.subplots_adjust(hspace = 0.5)
+	plt.savefig('alignment.png')
