@@ -9,7 +9,7 @@ import ctc
 T, B, C = 128, 256, 32
 t = T // 2 - 4
 blank = 0
-device = 'cpu'
+device = 'cuda'
 seed = 1
 atol = 1e-3
 for set_seed in [torch.manual_seed] + ([torch.cuda.manual_seed_all] if device == 'cuda' else []):
