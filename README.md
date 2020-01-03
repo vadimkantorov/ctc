@@ -60,3 +60,4 @@ https://www.cs.toronto.edu/~graves/icml_2006.pdf
    - https://github.com/zh217/torch-asg/blob/master/torch_asg/native/force_aligned_lattice.cpp
    - https://github.com/amaas/stanford-ctc/blob/master/ctc/ctc.py
    - https://github.com/skaae/Lasagne-CTC/blob/master/ctc_cost.py
+   - https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/LossCTC.cpp#L37
