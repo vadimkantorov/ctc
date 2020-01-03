@@ -23,6 +23,25 @@ Grad matches: True
 CE grad matches: True
 ```
 
+#### Very rought time measurements if torch.logsumexp is used
+```
+Device: cuda
+Log-probs shape (batch X time X channels): 128x256x32
+Built-in CTC loss fwd 0.002052783966064453 bwd 0.0167086124420166
+Custom CTC loss fwd 0.09685754776000977 bwd 0.14192843437194824
+Custom loss matches: True
+Grad matches: True
+CE grad matches: True
+
+Device: cpu
+Log-probs shape (batch X time X channels): 128x256x32
+Built-in CTC loss fwd 0.017746925354003906 bwd 0.21297860145568848
+Custom CTC loss fwd 0.38710451126098633 bwd 5.190514087677002
+Custom loss matches: True
+Grad matches: True
+CE grad matches: True
+```
+
 ### Alignment image example
 ![](https://user-images.githubusercontent.com/1041752/71736894-8615e800-2e52-11ea-81cb-cb95b92175c6.png)
 
