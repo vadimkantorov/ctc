@@ -3,6 +3,7 @@ A primer on CTC implementation in pure Python PyTorch code. This impl is not sui
 - Gradients are computed via PyTorch autograd instead of a separate beta computation
 - Viterbi path useful for forced alignment
 - Get alignment targets out of any CTC impl, so that label smoothing or reweighting can be applied [1, 2]
+- It might support double-backwards (not checked)
 
 ### Very rough time measurements
 ```
