@@ -1,42 +1,6 @@
 import torch
 import torch.nn.functional as F
 
-class LogsumexpFunction(torch.autograd.function.Function):
-	@staticmethod
-	def forward(self, x0, x1, x2):
-		m = torch.max(torch.max(x0, x1), x2)
-		m = m.masked_fill_(torch.isinf(m), 0)
-		e0 = (x0 - m).exp_()
-		e1 = (x1 - m).exp_()
-		e2 = (x2 - m).exp_()
-		e = (e0 + e1 + e2).clamp_(min = 1e-16)
-		self.save_for_backward(e0, e1, e2, e)
-		return e.log().add_(m)
-
-	@staticmethod
-	def backward(self, grad_output):
-		e0, e1, e2, e = self.saved_tensors
-		g = grad_output / e
-		return g * e0, g * e1, g * e2
-
-def logadd(x0, x1, x2):
-	# produces nan gradients in backward if -inf log-space zero element is used https://github.com/pytorch/pytorch/issues/31829
-	return torch.logsumexp(torch.stack([x0, x1, x2]), dim = 0)
-	
-	#return LogsumexpFunction.apply(x0, x1, x2)
-	
-	# produces inplace modification error https://github.com/pytorch/pytorch/issues/31819
-	#m = torch.max(torch.max(x0, x1), x2)
-	#m = m.masked_fill(torch.isinf(m), 0)
-	#res = (x0 - m).exp() + (x1 - m).exp() + (x2 - m).exp()
-	#return res.log().add(m)
-
-def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, logits, blank = 0, ctc_loss = F.ctc_loss):
-	loss = ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = blank, reduction = 'sum')
-	grad, = torch.autograd.grad(loss, logits, retain_graph = True)
-	temporal_mask = (torch.arange(len(log_probs), device = input_lengths.device, dtype = input_lengths.dtype).unsqueeze(1) < input_lengths.unsqueeze(0)).unsqueeze(-1)
-	return (log_probs.exp() * temporal_mask - grad).detach()
-
 def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0, reduction : str = 'none', alignment : bool = False):
 	# https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/LossCTC.cpp#L37
 	# https://github.com/skaae/Lasagne-CTC/blob/master/ctc_cost.py#L162
@@ -70,3 +34,39 @@ def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0,
 		indices_ = torch.stack([(indices - 2) * diff_labels[B, (indices - zero_padding).clamp(min = 0)], (indices - 1).clamp(min = 0), indices], dim = -1)
 		path[t - 1] += (indices - 2 + log_alpha[t - 1, B].gather(-1, indices_).max(dim = -1).indices).clamp(min = 0)
 	return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., (zero_padding + 1)::2]
+
+def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, logits, blank = 0, ctc_loss = F.ctc_loss):
+	loss = ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = blank, reduction = 'sum')
+	grad, = torch.autograd.grad(loss, logits, retain_graph = True)
+	temporal_mask = (torch.arange(len(log_probs), device = input_lengths.device, dtype = input_lengths.dtype).unsqueeze(1) < input_lengths.unsqueeze(0)).unsqueeze(-1)
+	return (log_probs.exp() * temporal_mask - grad).detach()
+
+def logadd(x0, x1, x2):
+	# produces nan gradients in backward if -inf log-space zero element is used https://github.com/pytorch/pytorch/issues/31829
+	return torch.logsumexp(torch.stack([x0, x1, x2]), dim = 0)
+	
+	#return LogsumexpFunction.apply(x0, x1, x2)
+	
+	# produces inplace modification error https://github.com/pytorch/pytorch/issues/31819
+	#m = torch.max(torch.max(x0, x1), x2)
+	#m = m.masked_fill(torch.isinf(m), 0)
+	#res = (x0 - m).exp() + (x1 - m).exp() + (x2 - m).exp()
+	#return res.log().add(m)
+
+class LogsumexpFunction(torch.autograd.function.Function):
+	@staticmethod
+	def forward(self, x0, x1, x2):
+		m = torch.max(torch.max(x0, x1), x2)
+		m = m.masked_fill_(torch.isinf(m), 0)
+		e0 = (x0 - m).exp_()
+		e1 = (x1 - m).exp_()
+		e2 = (x2 - m).exp_()
+		e = (e0 + e1 + e2).clamp_(min = 1e-16)
+		self.save_for_backward(e0, e1, e2, e)
+		return e.log().add_(m)
+
+	@staticmethod
+	def backward(self, grad_output):
+		e0, e1, e2, e = self.saved_tensors
+		g = grad_output / e
+		return g * e0, g * e1, g * e2
