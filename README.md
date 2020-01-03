@@ -53,3 +53,10 @@ CE grad matches: True
 4. Connectionist Temporal Classification: Labelling Unsegmented Sequence Data with Recurrent Neural Networks; Graves et all; 
 https://www.cs.toronto.edu/~graves/icml_2006.pdf
 5. Sequence Modeling With CTC, Hannun et al, https://distill.pub/2017/ctc/
+6. Other CTC implementations:
+   - https://github.com/rakeshvar/rnn_ctc/blob/master/nnet/ctc.py#L96
+   - https://github.com/artbataev/end2end/blob/master/pytorch_end2end/src/losses/forward_backward.cpp
+   - https://github.com/jamesdanged/LatticeCtc
+   - https://github.com/zh217/torch-asg/blob/master/torch_asg/native/force_aligned_lattice.cpp
+   - https://github.com/amaas/stanford-ctc/blob/master/ctc/ctc.py
+   - https://github.com/skaae/Lasagne-CTC/blob/master/ctc_cost.py
