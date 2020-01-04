@@ -23,7 +23,7 @@ target_lengths = torch.full((B,), t, dtype = torch.long, device = device)
 log_probs = logits.log_softmax(dim = -1)
 
 print('Device:', device)
-print('Log-probs shape (batch X time X channels):', 'x'.join(map(str, log_probs.shape)))
+print('Log-probs shape (time X batch X channels):', 'x'.join(map(str, log_probs.shape)))
 
 tic = tictoc()
 builtin_ctc = F.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none')
