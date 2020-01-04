@@ -48,7 +48,7 @@ CE grad matches: True
 
 ### References
 1. A Novel Re-weighting Method for Connectionist Temporal Classification; Li et al; https://arxiv.org/abs/1904.10619
-2. Focal CTC Loss for Chinese Optical Character Recognition on Unbalanced Datasets"; Feng et al; https://www.hindawi.com/journals/complexity/2019/9345861/
+2. Focal CTC Loss for Chinese Optical Character Recognition on Unbalanced Datasets; Feng et al; https://www.hindawi.com/journals/complexity/2019/9345861/
 3. Improved training for online end-to-end speech recognition systems; Kim et al; https://arxiv.org/abs/1711.02212
 4. Connectionist Temporal Classification: Labelling Unsegmented Sequence Data with Recurrent Neural Networks; Graves et all; 
 https://www.cs.toronto.edu/~graves/icml_2006.pdf
