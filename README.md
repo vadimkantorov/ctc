@@ -46,7 +46,7 @@ CE grad matches: True
 ### Alignment image example
 ![](https://user-images.githubusercontent.com/1041752/71736894-8615e800-2e52-11ea-81cb-cb95b92175c6.png)
 
-### References
+### References (CTC)
 1. A Novel Re-weighting Method for Connectionist Temporal Classification; Li et al; https://arxiv.org/abs/1904.10619
 2. Focal CTC Loss for Chinese Optical Character Recognition on Unbalanced Datasets; Feng et al; https://www.hindawi.com/journals/complexity/2019/9345861/
 3. Improved training for online end-to-end speech recognition systems; Kim et al; https://arxiv.org/abs/1711.02212
@@ -61,3 +61,10 @@ https://www.cs.toronto.edu/~graves/icml_2006.pdf
    - https://github.com/amaas/stanford-ctc/blob/master/ctc/ctc.py
    - https://github.com/skaae/Lasagne-CTC/blob/master/ctc_cost.py
    - https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/LossCTC.cpp#L37
+   - https://github.com/musyoku/chainer-gram-ctc https://github.com/musyoku/chainer-cuda-ctc
+
+### References (beam search)
+- https://towardsdatascience.com/beam-search-decoding-in-ctc-trained-neural-networks-5a889a3d85a7
+- https://github.com/githubharald/CTCDecoder
+- https://github.com/githubharald/CTCWordBeamSearch
+- https://gist.github.com/awni/56369a90d03953e370f3964c826ed4b0
