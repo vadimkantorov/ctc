@@ -68,3 +68,10 @@ https://www.cs.toronto.edu/~graves/icml_2006.pdf
 - https://github.com/githubharald/CTCDecoder
 - https://github.com/githubharald/CTCWordBeamSearch
 - https://gist.github.com/awni/56369a90d03953e370f3964c826ed4b0
+
+- https://github.com/wouterkool/stochastic-beam-search
+- https://github.com/mjansche/ctc_sampling
+- https://www.aclweb.org/anthology/D19-1331/
+- https://arxiv.org/abs/1905.08760
+- https://arxiv.org/abs/1804.07915
+- http://proceedings.mlr.press/v97/cohen19a/cohen19a.pdf
