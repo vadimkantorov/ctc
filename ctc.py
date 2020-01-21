@@ -29,8 +29,7 @@ def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0,
 	
 	path = torch.zeros(len(log_alpha), len(B), device = log_alpha.device, dtype = torch.int64)
 	path[input_lengths - 1, B] = zero_padding + 2 * target_lengths - 1 + l1l2.max(dim = -1).indices
-	for t in range(len(path) - 1, 1, -1):
-		indices = path[t]
+	for t, indices in reversed(list(enumerate(path))[1:]):
 		indices_ = torch.stack([(indices - 2) * diff_labels[B, (indices - zero_padding).clamp(min = 0)], (indices - 1).clamp(min = 0), indices], dim = -1)
 		path[t - 1] += (indices - 2 + log_alpha[t - 1, B].gather(-1, indices_).max(dim = -1).indices).clamp(min = 0)
 	return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., (zero_padding + 1)::2]
