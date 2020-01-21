@@ -65,6 +65,7 @@ https://www.cs.toronto.edu/~graves/icml_2006.pdf
 
 ### References (beam search)
 - https://towardsdatascience.com/beam-search-decoding-in-ctc-trained-neural-networks-5a889a3d85a7
+- https://medium.com/corti-ai/ctc-networks-and-language-models-prefix-beam-search-explained-c11d1ee23306
 - https://github.com/githubharald/CTCDecoder
 - https://github.com/githubharald/CTCWordBeamSearch
 - https://gist.github.com/awni/56369a90d03953e370f3964c826ed4b0
