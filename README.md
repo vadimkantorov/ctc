@@ -76,3 +76,4 @@ https://www.cs.toronto.edu/~graves/icml_2006.pdf
 - https://arxiv.org/abs/1905.08760
 - https://arxiv.org/abs/1804.07915
 - http://proceedings.mlr.press/v97/cohen19a/cohen19a.pdf
+- https://github.com/corticph/prefix-beam-search/
