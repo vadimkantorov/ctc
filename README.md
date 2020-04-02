@@ -62,6 +62,7 @@ https://www.cs.toronto.edu/~graves/icml_2006.pdf
    - https://github.com/skaae/Lasagne-CTC/blob/master/ctc_cost.py
    - https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/LossCTC.cpp#L37
    - https://github.com/musyoku/chainer-gram-ctc https://github.com/musyoku/chainer-cuda-ctc
+   - https://github.com/1ytic/warp-rnnt
 
 ### References (beam search)
 - https://towardsdatascience.com/beam-search-decoding-in-ctc-trained-neural-networks-5a889a3d85a7
