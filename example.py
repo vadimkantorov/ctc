@@ -45,7 +45,7 @@ print('Custom loss matches:', torch.allclose(builtin_ctc, custom_ctc, atol = ato
 print('Grad matches:', torch.allclose(builtin_ctc_grad, custom_ctc_grad, atol = atol))
 print('CE grad matches:', torch.allclose(builtin_ctc_grad, ce_ctc_grad, atol = atol))
 
-alignment = ctc.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none', alignment = True)
+alignment = ctc.alignment(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none')
 a = alignment[:, 0, :target_lengths[0]]
 plt.subplot(211)
 plt.title('Input-Output Viterbi alignment')
