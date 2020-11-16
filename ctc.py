@@ -48,7 +48,7 @@ def alignment(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : 
 		torch.full_like(targets[:, :1], blank)
 	], dim = -1)
 	diff_labels = torch.cat([
-		torch.as_tensor([[False, False]], device = targets.device).expand(len(B), -1),
+		torch.as_tensor([[False, False]], device = targets.device).expand(batch_size, -1),
 		_t_a_r_g_e_t_s_[:, 2:] != _t_a_r_g_e_t_s_[:, :-2]
 	], dim = 1)
 
