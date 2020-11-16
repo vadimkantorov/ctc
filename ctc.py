@@ -1,3 +1,5 @@
+# TODO: try to replace fancy tensor indexing by gather / scatter 
+
 import math
 import torch
 import torch.nn.functional as F
@@ -113,9 +115,9 @@ class LogsumexpFunction(torch.autograd.function.Function):
 		e0 = (x0 - m).exp_()
 		e1 = (x1 - m).exp_()
 		e2 = (x2 - m).exp_()
-		e = (e0 + e1 + e2).clamp_(min = 1e-16)
+		e = (e0 + e1).add_(e2).clamp_(min = 1e-16)
 		self.save_for_backward(e0, e1, e2, e)
-		return e.log().add_(m)
+		return e.log_().add_(m)
 
 	@staticmethod
 	def backward(self, grad_output):
