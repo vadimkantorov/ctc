@@ -1,38 +1,87 @@
+import math
 import torch
 import torch.nn.functional as F
 
 #@torch.jit.script
-def ctc_loss(log_probs, targets, input_lengths, target_lengths, blank : int = 0, reduction : str = 'none', alignment : bool = False):
-	B = torch.arange(len(targets), device = input_lengths.device)
-	targets_ = torch.cat([targets, targets[:, :1]], dim = -1)
-	targets_ = torch.stack([torch.full_like(targets_, blank), targets_], dim = -1).flatten(start_dim = -2)
-	diff_labels = torch.cat([torch.as_tensor([[False, False]], device = targets.device).expand(len(B), -1), targets_[:, 2:] != targets_[:, :-2]], dim = 1)
+def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank : int = 0, reduction : str = 'none', , finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min):
+	input_time_size, batch_size = log_probs.shape[:2]
+	B = torch.arange(batch_size, device = input_lengths.device)
 	
-	# if the -inf is used as neutral element, custom logsumexp must be used
-	#zero = float('-inf')
-	# to avoid nan grad in torch.logsumexp
-	zero = torch.finfo(log_probs.dtype).min	
-
-	zero, zero_padding = torch.tensor(zero, device = log_probs.device, dtype = log_probs.dtype), 2
-	log_probs_ = log_probs.gather(-1, targets_.expand(len(log_probs), -1, -1))
-	log_alpha = torch.full((len(log_probs), len(B), zero_padding + targets_.shape[-1]), zero, device = log_probs.device, dtype = log_probs.dtype)
+	_t_a_r_g_e_t_s_ = torch.cat([targets, targets[:, :1]], dim = -1)
+	_t_a_r_g_e_t_s_ = torch.stack([torch.full_like(_t_a_r_g_e_t_s_, blank), _t_a_r_g_e_t_s_], dim = -1).flatten(start_dim = -2)
+	
+	diff_labels = torch.cat([torch.as_tensor([[False, False]], device = targets.device).expand(batch_size, -1), _t_a_r_g_e_t_s_[:, 2:] != _t_a_r_g_e_t_s_[:, :-2]], dim = 1)
+	
+	# if the -inf is used as neutral element, custom logsumexp must be used to avoid nan grad in torch.logsumexp
+	# zero = float('-inf')
+	
+	zero_padding, zero = 2, torch.tensor(finfo_min_fp16 if log_probs.dtype is torch.float16 else finfo_min_fp32, device = log_probs.device, dtype = log_probs.dtype)
+	log_probs_ = log_probs.gather(-1, _t_a_r_g_e_t_s_.expand(input_time_size, -1, -1))
+	log_alpha = torch.full((input_time_size, batch_size, zero_padding + _t_a_r_g_e_t_s_.shape[-1]), zero, device = log_probs.device, dtype = log_probs.dtype)
 	log_alpha[0, :, zero_padding + 0] = log_probs[0, :, blank]
-	log_alpha[0, :, zero_padding + 1] = log_probs[0, B, targets_[:, 1]]
-	# log_alpha[1:, :, zero_padding:] = log_probs.gather(-1, targets_.expand(len(log_probs), -1, -1))[1:]
-	for t in range(1, len(log_probs)):
+	log_alpha[0, :, zero_padding + 1] = log_probs[0, B, _t_a_r_g_e_t_s_[:, 1]]
+	# log_alpha[1:, :, zero_padding:] = log_probs.gather(-1, _t_a_r_g_e_t_s_.expand(len(log_probs), -1, -1))[1:]
+	for t in range(1, input_time_size):
 		log_alpha[t, :, 2:] = log_probs_[t] + logadd(log_alpha[t - 1, :, 2:], log_alpha[t - 1, :, 1:-1], torch.where(diff_labels, log_alpha[t - 1, :, :-2], zero))
 
 	l1l2 = log_alpha[input_lengths - 1, B].gather(-1, torch.stack([zero_padding + target_lengths * 2 - 1, zero_padding + target_lengths * 2], dim = -1)) 
 	loss = -torch.logsumexp(l1l2, dim = -1)
-	if not alignment:
-		return loss
+	return loss
+
+	#if not alignment:
+	#	return loss
 	
-	path = torch.zeros(len(log_alpha), len(B), device = log_alpha.device, dtype = torch.int64)
-	path[input_lengths - 1, B] = zero_padding + 2 * target_lengths - 1 + l1l2.max(dim = -1).indices
-	for t, indices in reversed(list(enumerate(path))[1:]):
-		indices_ = torch.stack([(indices - 2) * diff_labels[B, (indices - zero_padding).clamp(min = 0)], (indices - 1).clamp(min = 0), indices], dim = -1)
-		path[t - 1] += (indices - 2 + log_alpha[t - 1, B].gather(-1, indices_).max(dim = -1).indices).clamp(min = 0)
-	return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., (zero_padding + 1)::2]
+	#path = torch.zeros(len(log_alpha), len(B), device = log_alpha.device, dtype = torch.int64)
+	#path[input_lengths - 1, B] = zero_padding + 2 * target_lengths - 1 + l1l2.max(dim = -1).indices
+	#for t, indices in reversed(list(enumerate(path))[1:]):
+	#	indices_ = torch.stack([(indices - 2) * diff_labels[B, (indices - zero_padding).clamp(min = 0)], (indices - 1).clamp(min = 0), indices], dim = -1)
+	#	path[t - 1] += (indices - 2 + log_alpha[t - 1, B].gather(-1, indices_).max(dim = -1).indices).clamp(min = 0)
+	#return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., (zero_padding + 1)::2]
+
+@torch.jit.script
+def alignment(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank: int = 0, finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min):
+	input_time_size, batch_size = log_probs.shape[:2]
+	B = torch.arange(batch_size, device = input_lengths.device)
+	
+	_t_a_r_g_e_t_s_ = torch.cat([
+		torch.stack([torch.full_like(targets, blank), targets], dim = -1).flatten(start_dim = -2),
+		torch.full_like(targets[:, :1], blank)
+	], dim = -1)
+	diff_labels = torch.cat([
+		torch.as_tensor([[False, False]], device = targets.device).expand(len(B), -1),
+		_t_a_r_g_e_t_s_[:, 2:] != _t_a_r_g_e_t_s_[:, :-2]
+	], dim = 1)
+
+	zero_padding, zero = 2, torch.tensor(finfo_min_fp16 if log_probs.dtype is torch.float16 else finfo_min_fp32, device = log_probs.device, dtype = log_probs.dtype)
+	padded_t = zero_padding + _t_a_r_g_e_t_s_.shape[-1]
+	log_alpha = torch.full((batch_size, padded_t), zero, device = log_probs.device, dtype = log_probs.dtype)
+	log_alpha[:, zero_padding + 0] = log_probs[0, :, blank]
+	log_alpha[:, zero_padding + 1] = log_probs[0, B, _t_a_r_g_e_t_s_[:, 1]]
+
+	packmask = 0b11
+	packnibbles = 4 # packnibbles = 1
+	backpointers_shape = [len(log_probs), batch_size, int(math.ceil(padded_t / packnibbles))]
+	backpointers = torch.zeros(backpointers_shape, device = log_probs.device, dtype = torch.uint8)
+	backpointer = torch.zeros(backpointers_shape[1:], device = log_probs.device, dtype = torch.uint8)
+	packshift = torch.tensor([[[6, 4, 2, 0]]], device = log_probs.device, dtype = torch.uint8)
+
+	for t in range(1, input_time_size):
+		prev = torch.stack([log_alpha[:, 2:], log_alpha[:, 1:-1], torch.where(diff_labels, log_alpha[:, :-2], zero)])
+		log_alpha[:, zero_padding:] = log_probs[t].gather(-1, _t_a_r_g_e_t_s_) + prev.logsumexp(dim = 0)
+		backpointer[:, zero_padding:(zero_padding + prev.shape[-1] )] = prev.argmax(dim = 0)
+		torch.sum(backpointer.view(len(backpointer), -1, packnibbles) << packshift, dim = -1, out = backpointers[t]) # backpointers[t] = backpointer
+
+	l1l2 = log_alpha.gather(-1, torch.stack([zero_padding + target_lengths * 2 - 1, zero_padding + target_lengths * 2], dim = -1))
+
+	path = torch.zeros(input_time_size, batch_size, device = log_alpha.device, dtype = torch.long)
+	path[input_lengths - 1, B] = zero_padding + target_lengths * 2 - 1 + l1l2.argmax(dim = -1)
+
+	for t in range(input_time_size - 1, 0, -1):
+		indices = path[t]
+		backpointer = (backpointers[t].unsqueeze(-1) >> packshift).view_as(backpointer) #backpointer = backpointers[t]
+		path[t - 1] += indices - backpointer.gather(-1, indices.unsqueeze(-1)).squeeze(-1).bitwise_and_(packmask)
+	
+	return torch.zeros_like(_t_a_r_g_e_t_s_, dtype = torch.int64).scatter_(-1, (path.t() - zero_padding).clamp(min = 0), torch.arange(input_time_size, device = log_alpha.device).expand(batch_size, -1))[:, 1::2]
 
 def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, blank = 0, ctc_loss = F.ctc_loss, retain_graph = True):
 	loss = ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = blank, reduction = 'sum')
