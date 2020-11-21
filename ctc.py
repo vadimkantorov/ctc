@@ -32,7 +32,7 @@ def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : t
 	if not alignment:
 		return loss
 	
-	# below is for debugging, for real alignment use more efficient the distinct alignment(...) method
+	# below is for debugging, for real alignment use more efficient the distinct ctc_alignment(...) method
 	path = torch.zeros(len(log_alpha), len(B), device = log_alpha.device, dtype = torch.int64)
 	path[input_lengths - 1, B] = zero_padding + 2 * target_lengths - 1 + l1l2.max(dim = -1).indices
 	for t, indices in reversed(list(enumerate(path))[1:]):
@@ -41,7 +41,7 @@ def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : t
 	return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., (zero_padding + 1)::2]
 
 @torch.jit.script
-def alignment(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank: int = 0, finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min):
+def ctc_alignment(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank: int = 0, finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min):
 	input_time_size, batch_size = log_probs.shape[:2]
 	B = torch.arange(batch_size, device = input_lengths.device)
 	
