@@ -16,7 +16,7 @@ def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : t
 	
 	# if zero = float('-inf') is used as neutral element, custom logsumexp must be used to avoid nan grad in torch.logsumexp
 	
-	zero_padding, zero = 2, torch.tensor(finfo_min_fp16 if log_probs.dtype is torch.float16 else finfo_min_fp32, device = log_probs.device, dtype = log_probs.dtype)
+	zero_padding, zero = 2, torch.tensor(finfo_min_fp16 if log_probs.dtype == torch.float16 else finfo_min_fp32, device = log_probs.device, dtype = log_probs.dtype)
 	log_probs_ = log_probs.gather(-1, _t_a_r_g_e_t_s_.expand(input_time_size, -1, -1))
 	log_alpha = torch.full((input_time_size, batch_size, zero_padding + _t_a_r_g_e_t_s_.shape[-1]), zero, device = log_probs.device, dtype = log_probs.dtype)
 	log_alpha[0, :, zero_padding + 0] = log_probs[0, :, blank]
@@ -54,7 +54,7 @@ def ctc_alignment(log_probs : torch.Tensor, targets : torch.Tensor, input_length
 		_t_a_r_g_e_t_s_[:, 2:] != _t_a_r_g_e_t_s_[:, :-2]
 	], dim = 1)
 
-	zero_padding, zero = 2, torch.tensor(finfo_min_fp16 if log_probs.dtype is torch.float16 else finfo_min_fp32, device = log_probs.device, dtype = log_probs.dtype)
+	zero_padding, zero = 2, torch.tensor(finfo_min_fp16 if log_probs.dtype == torch.float16 else finfo_min_fp32, device = log_probs.device, dtype = log_probs.dtype)
 	padded_t = zero_padding + _t_a_r_g_e_t_s_.shape[-1]
 	log_alpha = torch.full((batch_size, padded_t), zero, device = log_probs.device, dtype = log_probs.dtype)
 	log_alpha[:, zero_padding + 0] = log_probs[0, :, blank]
