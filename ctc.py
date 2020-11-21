@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 
 #@torch.jit.script
-def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank : int = 0, reduction : str = 'none', , finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min):
+def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank : int = 0, reduction : str = 'none', finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min, alignment : bool = False):
 	input_time_size, batch_size = log_probs.shape[:2]
 	B = torch.arange(batch_size, device = input_lengths.device)
 	
@@ -14,8 +14,7 @@ def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : t
 	
 	diff_labels = torch.cat([torch.as_tensor([[False, False]], device = targets.device).expand(batch_size, -1), _t_a_r_g_e_t_s_[:, 2:] != _t_a_r_g_e_t_s_[:, :-2]], dim = 1)
 	
-	# if the -inf is used as neutral element, custom logsumexp must be used to avoid nan grad in torch.logsumexp
-	# zero = float('-inf')
+	# if zero = float('-inf') is used as neutral element, custom logsumexp must be used to avoid nan grad in torch.logsumexp
 	
 	zero_padding, zero = 2, torch.tensor(finfo_min_fp16 if log_probs.dtype is torch.float16 else finfo_min_fp32, device = log_probs.device, dtype = log_probs.dtype)
 	log_probs_ = log_probs.gather(-1, _t_a_r_g_e_t_s_.expand(input_time_size, -1, -1))
@@ -30,15 +29,16 @@ def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : t
 	loss = -torch.logsumexp(l1l2, dim = -1)
 	return loss
 
-	#if not alignment:
-	#	return loss
+	if not alignment:
+		return loss
 	
-	#path = torch.zeros(len(log_alpha), len(B), device = log_alpha.device, dtype = torch.int64)
-	#path[input_lengths - 1, B] = zero_padding + 2 * target_lengths - 1 + l1l2.max(dim = -1).indices
-	#for t, indices in reversed(list(enumerate(path))[1:]):
-	#	indices_ = torch.stack([(indices - 2) * diff_labels[B, (indices - zero_padding).clamp(min = 0)], (indices - 1).clamp(min = 0), indices], dim = -1)
-	#	path[t - 1] += (indices - 2 + log_alpha[t - 1, B].gather(-1, indices_).max(dim = -1).indices).clamp(min = 0)
-	#return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., (zero_padding + 1)::2]
+	# below is for debugging, for real alignment use more efficient the distinct alignment(...) method
+	path = torch.zeros(len(log_alpha), len(B), device = log_alpha.device, dtype = torch.int64)
+	path[input_lengths - 1, B] = zero_padding + 2 * target_lengths - 1 + l1l2.max(dim = -1).indices
+	for t, indices in reversed(list(enumerate(path))[1:]):
+		indices_ = torch.stack([(indices - 2) * diff_labels[B, (indices - zero_padding).clamp(min = 0)], (indices - 1).clamp(min = 0), indices], dim = -1)
+		path[t - 1] += (indices - 2 + log_alpha[t - 1, B].gather(-1, indices_).max(dim = -1).indices).clamp(min = 0)
+	return torch.zeros_like(log_alpha).scatter_(-1, path.unsqueeze(-1), 1.0)[..., (zero_padding + 1)::2]
 
 @torch.jit.script
 def alignment(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank: int = 0, finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min):
