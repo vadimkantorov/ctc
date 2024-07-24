@@ -9,7 +9,7 @@ import ctc
 T, B, C = 128, 256, 32
 t = T // 2 - 4
 blank = 0
-device = 'cuda'
+device = 'cpu'#'cuda'
 seed = 1
 atol = 1e-3
 for set_seed in [torch.manual_seed] + ([torch.cuda.manual_seed_all] if device == 'cuda' else []):
@@ -45,8 +45,8 @@ print('Custom loss matches:', torch.allclose(builtin_ctc, custom_ctc, atol = ato
 print('Grad matches:', torch.allclose(builtin_ctc_grad, custom_ctc_grad, atol = atol))
 print('CE grad matches:', torch.allclose(builtin_ctc_grad, ce_ctc_grad, atol = atol))
 
-alignment = ctc.alignment(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none')
-a = alignment[:, 0, :target_lengths[0]]
+alignment = ctc.ctc_alignment(log_probs, targets, input_lengths, target_lengths, blank = 0)
+a = torch.zeros(T, t); a[alignment[0, :target_lengths[0]], torch.arange(t)] = 1.0
 plt.subplot(211)
 plt.title('Input-Output Viterbi alignment')
 plt.imshow(a.t().cpu(), origin = 'lower', aspect = 'auto')
