@@ -2,7 +2,6 @@
 
 import math
 import torch
-import torch.nn.functional as F
 
 #@torch.jit.script
 def ctc_loss(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank : int = 0, reduction : str = 'none', finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min, alignment : bool = False) -> torch.Tensor:
@@ -155,7 +154,7 @@ def ctc_alignment_uncompressed(
 		torch.arange(len(path), device = log_alpha.device).expand(len(B), -1)
 	)[:, 1::2]
 
-def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, blank = 0, ctc_loss = F.ctc_loss, retain_graph = True):
+def ctc_alignment_targets(log_probs, targets, input_lengths, target_lengths, blank = 0, ctc_loss = torch.nn.functional.ctc_loss, retain_graph = True):
 	loss = ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = blank, reduction = 'sum')
 	probs = log_probs.exp()
 	# to simplify API we inline log_softmax gradient, i.e. next two lines are equivalent to: grad_logits, = torch.autograd.grad(loss, logits, retain_graph = True). gradient formula explained at https://stackoverflow.com/questions/35304393/trying-to-understand-code-that-computes-the-gradient-wrt-to-the-input-for-logsof
@@ -193,4 +192,4 @@ class LogsumexpFunction(torch.autograd.function.Function):
 	def backward(self, grad_output):
 		e0, e1, e2, e = self.saved_tensors
 		g = grad_output / e
-		return g * e0, g * e1, g * e2
+		return (g * e0, g * e1, g * e2)
