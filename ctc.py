@@ -86,16 +86,7 @@ def ctc_alignment(log_probs : torch.Tensor, targets : torch.Tensor, input_length
 
 
 
-def ctc_alignment_uncompressed(
-	log_probs : torch.Tensor,
-	targets : torch.Tensor,
-	input_lengths : torch.Tensor,
-	target_lengths : torch.Tensor,
-	blank: int = 0,
-	pack_backpointers: bool = False,
-	finfo_min_fp32: float = torch.finfo(torch.float32).min,
-	finfo_min_fp16: float = torch.finfo(torch.float16).min
-) -> torch.Tensor:
+def ctc_alignment_uncompressed(log_probs : torch.Tensor, targets : torch.Tensor, input_lengths : torch.Tensor, target_lengths : torch.Tensor, blank: int = 0, pack_backpointers: bool = False, finfo_min_fp32: float = torch.finfo(torch.float32).min, finfo_min_fp16: float = torch.finfo(torch.float16).min) -> torch.Tensor:
 	B = torch.arange(len(targets), device = input_lengths.device)
 	_t_a_r_g_e_t_s_ = torch.cat([
 		torch.stack([torch.full_like(targets, blank), targets], dim = -1).flatten(start_dim = -2),
