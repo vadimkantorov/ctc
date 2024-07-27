@@ -2,7 +2,6 @@ import time
 import matplotlib.pyplot as plt
 
 import torch
-import torch.nn.functional as F
 
 import ctc
 
@@ -26,7 +25,7 @@ print('Device:', device)
 print('Log-probs shape (time X batch X channels):', 'x'.join(map(str, log_probs.shape)))
 
 tic = tictoc()
-builtin_ctc = F.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none')
+builtin_ctc = torch.nn.functional.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank = 0, reduction = 'none')
 toc = tictoc()
 builtin_ctc_grad, = torch.autograd.grad(builtin_ctc.sum(), logits, retain_graph = True)
 print('Built-in CTC loss', 'fwd', toc - tic, 'bwd', tictoc() - toc)
