@@ -74,7 +74,7 @@ def ctc_alignment(log_probs : torch.Tensor, targets : torch.Tensor, input_length
 
 	l1l2 = log_alpha.gather(-1, torch.stack([zero_padding + target_lengths * 2 - 1, zero_padding + target_lengths * 2], dim = -1))
 
-	path = torch.zeros(input_time_size, batch_size, device = log_alpha.device, dtype = torch.long)
+	path = torch.zeros(input_time_size, batch_size, device = log_alpha.device, dtype = torch.int64)
 	path[input_lengths - 1, B] = zero_padding + target_lengths * 2 - 1 + l1l2.argmax(dim = -1)
 
 	for t in range(input_time_size - 1, 0, -1):
@@ -128,7 +128,7 @@ def ctc_alignment_uncompressed(log_probs : torch.Tensor, targets : torch.Tensor,
 		-1, torch.stack([zero_padding + target_lengths * 2 - 1, zero_padding + target_lengths * 2], dim = -1)
 	)
 
-	path = torch.zeros(len(log_probs), len(B), device = log_alpha.device, dtype = torch.long)
+	path = torch.zeros(len(log_probs), len(B), device = log_alpha.device, dtype = torch.int64)
 	path[input_lengths - 1, B] = zero_padding + target_lengths * 2 - 1 + l1l2.argmax(dim = -1)
 
 	for t in range(len(path) - 1, 0, -1):
@@ -140,7 +140,7 @@ def ctc_alignment_uncompressed(log_probs : torch.Tensor, targets : torch.Tensor,
 			backpointer = backpointers[t]
 
 		path[t - 1] += indices - backpointer.gather(-1, indices.unsqueeze(-1)).squeeze(-1).bitwise_and_(packmask)
-	return torch.zeros_like(_t_a_r_g_e_t_s_, dtype = torch.long).scatter_(
+	return torch.zeros_like(_t_a_r_g_e_t_s_, dtype = torch.int64).scatter_(
 		-1, (path.t() - zero_padding).clamp(min = 0),
 		torch.arange(len(path), device = log_alpha.device).expand(len(B), -1)
 	)[:, 1::2]
